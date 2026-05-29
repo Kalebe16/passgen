@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          files=$(gofmt -l .)
+
+          if [ -n "$files" ]; then
+            echo "Files not formatted:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: |
+          go test .
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Get App Version
+        run: |
+          VERSION=$(grep Version version.go | cut -d'"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build Linux AMD64
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o passgen
+          zip passgen-v$VERSION-linux-amd64.zip passgen
+          rm passgen
+
+      - name: Build Linux ARM64
+        run: |
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o passgen
+          zip passgen-v$VERSION-linux-arm64.zip passgen
+          rm passgen
+
+      - name: Build Windows AMD64
+        run: |
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o passgen.exe
+          zip passgen-v$VERSION-windows-amd64.zip passgen.exe
+          rm passgen.exe
+
+      - name: Build Windows ARM64
+        run: |
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o passgen.exe
+          zip passgen-v$VERSION-windows-arm64.zip passgen.exe
+          rm passgen.exe
+
+      - name: Build macOS Intel
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o passgen
+          zip passgen-v$VERSION-darwin-amd64.zip passgen
+          rm passgen
+
+      - name: Build macOS Apple Silicon
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o passgen
+          zip passgen-v$VERSION-darwin-arm64.zip passgen
+          rm passgen
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: passgen-v${{ env.VERSION }}
+          path: |
+            *.zip
